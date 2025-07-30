@@ -7,14 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, X, Briefcase, Code, Settings } from 'lucide-react';
-
-export interface JobRequirement {
-  title: string;
-  department: string;
-  experience: string;
-  skills: string[];
-  description: string;
-}
+import { JobRequirement } from '@/types/candidate';
 
 interface JobRequirementsProps {
   onRequirementsSet: (requirements: JobRequirement) => void;

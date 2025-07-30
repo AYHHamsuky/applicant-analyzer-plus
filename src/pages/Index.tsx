@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CVUpload, ProcessedCV } from '@/components/CVUpload';
-import { JobRequirements, JobRequirement } from '@/components/JobRequirements';
+import { CVUpload } from '@/components/CVUpload';
+import { JobRequirements } from '@/components/JobRequirements';
 import { Dashboard } from '@/components/Dashboard';
 import { CandidateCard } from '@/components/CandidateCard';
+import { ProcessedCV, JobRequirement } from '@/types/candidate';
 import { 
   Upload, 
   Settings, 

@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CandidateCard } from './CandidateCard';
-import { ProcessedCV } from './CVUpload';
-import { JobRequirement } from './JobRequirements';
+import { ProcessedCV, JobRequirement } from '@/types/candidate';
 import { 
   Users, 
   Award, 

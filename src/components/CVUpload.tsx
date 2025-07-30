@@ -4,26 +4,12 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useUploadCV, useCreateJob, useAnalyzeBulk } from '@/hooks/useApi';
+import { ProcessedCV, JobRequirement, candidateToProcessedCV, jobRequirementToJob } from '@/types/candidate';
 
 interface CVUploadProps {
   onFilesProcessed: (files: ProcessedCV[]) => void;
-  jobRequirements?: any;
-}
-
-export interface ProcessedCV {
-  id: string;
-  fileName: string;
-  candidateName: string;
-  email: string;
-  phone: string;
-  skills: string[];
-  experience: string;
-  education: string;
-  score: number;
-  summary: string;
-  matchingSkills: string[];
-  missingSkills: string[];
+  jobRequirements?: JobRequirement;
 }
 
 export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) => {
@@ -33,48 +19,92 @@ export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Real AI CV parsing
-  const parseCV = async (file: File): Promise<ProcessedCV> => {
+  const uploadCVMutation = useUploadCV();
+  const createJobMutation = useCreateJob();
+  const analyzeBulkMutation = useAnalyzeBulk();
+
+  // Process uploaded files and analyze against job requirements
+  const processFiles = async (files: File[]): Promise<ProcessedCV[]> => {
+    const processedCVs: ProcessedCV[] = [];
+    let jobId: string | null = null;
+
     try {
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('cv-uploads')
-        .upload(fileName, file)
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`)
+      // Create job if job requirements exist
+      if (jobRequirements) {
+        const jobData = jobRequirementToJob(jobRequirements);
+        const job = await createJobMutation.mutateAsync({
+          title: jobData.title!,
+          description: jobData.description!,
+          requirements: jobData.requirements!,
+          required_skills: jobData.required_skills!
+        });
+        jobId = job.id;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('cv-uploads')
-        .getPublicUrl(fileName)
+      // Upload each CV file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setProgress(((i + 1) / files.length) * 50); // First 50% for uploading
 
-      // Call the Edge Function for CV parsing
-      const { data, error } = await supabase.functions.invoke('parse-cv', {
-        body: {
-          fileUrl: publicUrl,
-          fileName: file.name,
-          jobRequirements
+        try {
+          const candidate = await uploadCVMutation.mutateAsync(file);
+          
+          // Convert to ProcessedCV format for compatibility
+          const processedCV = candidateToProcessedCV(candidate);
+          processedCVs.push(processedCV);
+
+          toast({
+            title: "CV Processed",
+            description: `Successfully processed CV for ${candidate.name}`,
+          });
+        } catch (error) {
+          console.error(`Failed to process ${file.name}:`, error);
+          toast({
+            title: "Upload Failed",
+            description: `Failed to process ${file.name}: ${error}`,
+            variant: "destructive",
+          });
         }
-      })
-
-      if (error) {
-        throw new Error(`AI parsing failed: ${error.message}`)
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to parse CV')
+      // If we have job requirements and candidates, analyze them
+      if (jobId && processedCVs.length > 0) {
+        setProgress(75);
+        
+        try {
+          const analysisResult = await analyzeBulkMutation.mutateAsync(jobId);
+          
+          // Update processedCVs with scores and skill analysis
+          const updatedCVs = processedCVs.map(cv => {
+            const result = analysisResult.results.find(r => r.candidate.id === cv.id);
+            if (result) {
+              return {
+                ...cv,
+                score: result.score.overall_score,
+                matchingSkills: result.matching_skills,
+                missingSkills: result.missing_skills
+              };
+            }
+            return cv;
+          });
+
+          setProgress(100);
+          return updatedCVs.sort((a, b) => b.score - a.score);
+        } catch (error) {
+          console.error('Analysis failed:', error);
+          toast({
+            title: "Analysis Warning",
+            description: "CVs uploaded but analysis failed. You can view candidates in dashboard.",
+            variant: "destructive",
+          });
+        }
       }
 
-      return data.data as ProcessedCV
-
+      setProgress(100);
+      return processedCVs;
     } catch (error) {
-      console.error('Error parsing CV:', error)
-      throw error
+      console.error('Process failed:', error);
+      throw error;
     }
   };
 
@@ -83,48 +113,58 @@ export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) =
     if (files.length === 0) return;
 
     setUploadedFiles(files);
-    processFiles(files);
+    handleProcessFiles(files);
   };
 
-  const processFiles = async (files: File[]) => {
+  const handleProcessFiles = async (files: File[]) => {
     setUploading(true);
     setProgress(0);
-    
-    const processedCVs: ProcessedCV[] = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      
-      try {
-        const processed = await parseCV(file);
-        processedCVs.push(processed);
-        
-        setProgress(((i + 1) / files.length) * 100);
-        
-        toast({
-          title: "CV Processed",
-          description: `Successfully analyzed ${file.name} with AI`,
-        });
-      } catch (error) {
-        console.error('Processing error:', error);
-        toast({
-          title: "Processing Error",
-          description: `Failed to analyze ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: "destructive",
-        });
+
+    try {
+      const processedCVs = await processFiles(files);
+      onFilesProcessed(processedCVs);
+
+      toast({
+        title: "Upload Complete",
+        description: `Successfully processed ${processedCVs.length} CV(s)`,
+      });
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to process CV files. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      setUploadedFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     }
-    
-    setUploading(false);
-    onFilesProcessed(processedCVs);
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const files = Array.from(event.dataTransfer.files);
-    if (files.length > 0) {
-      setUploadedFiles(files);
-      processFiles(files);
+    const validFiles = files.filter(file => 
+      file.type === 'application/pdf' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.type === 'application/msword'
+    );
+
+    if (validFiles.length !== files.length) {
+      toast({
+        title: "Invalid Files",
+        description: "Only PDF, DOC, and DOCX files are supported",
+        variant: "destructive",
+      });
+    }
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(validFiles);
+      handleProcessFiles(validFiles);
     }
   };
 
@@ -133,77 +173,81 @@ export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) =
   };
 
   return (
-    <Card className="p-8 animate-fade-in">
+    <Card className="p-8 max-w-2xl mx-auto">
       <div className="text-center space-y-6">
-        <div className="flex justify-center">
-          <div className="p-4 bg-gradient-primary rounded-full shadow-glow">
-            <Upload className="w-8 h-8 text-white" />
-          </div>
-        </div>
-        
         <div className="space-y-2">
-          <h3 className="text-2xl font-semibold text-foreground">Upload CVs for Analysis</h3>
+          <h2 className="text-2xl font-bold text-foreground">Upload CVs</h2>
           <p className="text-muted-foreground">
-            Drop your CV files here or click to browse. Supports PDF, DOC, and DOCX formats.
+            Upload candidate CVs for automatic parsing and analysis
           </p>
         </div>
 
-        <div
-          className="border-2 border-dashed border-border rounded-lg p-12 hover:border-primary/50 transition-colors cursor-pointer"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <div className="flex flex-col items-center space-y-4">
-            <FileText className="w-12 h-12 text-muted-foreground" />
-            <div className="text-center">
-              <p className="text-lg font-medium">Choose files or drag and drop</p>
-              <p className="text-sm text-muted-foreground">PDF, DOC, DOCX up to 10MB each</p>
+        {!uploading ? (
+          <div
+            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 space-y-4 hover:border-primary/50 transition-colors cursor-pointer"
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="flex justify-center">
+              <Upload className="w-12 h-12 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium">Drop CVs here or click to browse</p>
+              <p className="text-sm text-muted-foreground">
+                Supports PDF, DOC, and DOCX files up to 10MB each
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-primary animate-pulse" />
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>Processing CVs...</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Processing {uploadedFiles.length} file(s):</p>
+              <div className="space-y-1">
+                {uploadedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="w-3 h-3 text-success" />
+                    {file.name}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".pdf,.doc,.docx"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-
-        {uploading && (
-          <div className="space-y-4">
-            <Progress value={progress} className="w-full" />
-            <p className="text-sm text-muted-foreground">
-              Processing CVs... {Math.round(progress)}% complete
+        {jobRequirements && (
+          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Job Requirements Set</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              CVs will be automatically scored against the requirements for "{jobRequirements.title}"
             </p>
           </div>
         )}
-
-        {uploadedFiles.length > 0 && !uploading && (
-          <div className="space-y-2">
-            <h4 className="font-medium">Uploaded Files:</h4>
-            {uploadedFiles.map((file, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <FileText className="w-4 h-4" />
-                  <span className="text-sm">{file.name}</span>
-                </div>
-                <CheckCircle2 className="w-4 h-4 text-success" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Button 
-          variant="hero" 
-          size="lg" 
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? 'Processing...' : 'Select CVs to Upload'}
-        </Button>
       </div>
     </Card>
   );
