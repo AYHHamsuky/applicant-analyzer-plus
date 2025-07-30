@@ -260,7 +260,10 @@ const Index = () => {
         return (
           <div className="container mx-auto px-6 py-8">
             <div className="max-w-2xl mx-auto">
-              <CVUpload onFilesProcessed={handleFilesProcessed} />
+              <CVUpload 
+                onFilesProcessed={handleFilesProcessed} 
+                jobRequirements={jobRequirements}
+              />
             </div>
           </div>
         );
