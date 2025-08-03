@@ -36,24 +36,38 @@ export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) =
   // Real AI CV parsing
   const parseCV = async (file: File): Promise<ProcessedCV> => {
     try {
+      console.log('Starting CV parsing for:', file.name);
+      
       // Upload file to Supabase Storage
       const fileExt = file.name.split('.').pop()
       const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`
       
+      console.log('Uploading file to storage:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('cv-uploads')
         .upload(fileName, file)
 
       if (uploadError) {
+        console.error('Storage upload error:', uploadError);
         throw new Error(`Upload failed: ${uploadError.message}`)
       }
+
+      console.log('File uploaded successfully:', uploadData);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('cv-uploads')
         .getPublicUrl(fileName)
 
+      console.log('Public URL:', publicUrl);
+
       // Call the Edge Function for CV parsing
+      console.log('Calling parse-cv edge function with:', {
+        fileUrl: publicUrl,
+        fileName: file.name,
+        jobRequirements
+      });
+      
       const { data, error } = await supabase.functions.invoke('parse-cv', {
         body: {
           fileUrl: publicUrl,
@@ -62,14 +76,19 @@ export const CVUpload = ({ onFilesProcessed, jobRequirements }: CVUploadProps) =
         }
       })
 
+      console.log('Edge function response:', { data, error });
+
       if (error) {
+        console.error('Edge function error:', error);
         throw new Error(`AI parsing failed: ${error.message}`)
       }
 
       if (!data.success) {
+        console.error('Edge function returned failure:', data);
         throw new Error(data.error || 'Failed to parse CV')
       }
 
+      console.log('CV parsing completed successfully:', data.data);
       return data.data as ProcessedCV
 
     } catch (error) {

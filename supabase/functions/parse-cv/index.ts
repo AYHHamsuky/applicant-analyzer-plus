@@ -7,22 +7,33 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('Parse CV function called, method:', req.method);
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log('Parsing request body...');
     const { fileUrl, fileName, jobRequirements } = await req.json()
+    console.log('Received data:', { fileUrl, fileName, jobRequirements });
 
     // Get OpenAI API key from secrets
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiApiKey) {
+      console.error('OpenAI API key not found in environment');
       throw new Error('OpenAI API key not found')
     }
+    console.log('OpenAI API key found');
 
     // Download file content
+    console.log('Downloading file from:', fileUrl);
     const fileResponse = await fetch(fileUrl)
+    if (!fileResponse.ok) {
+      throw new Error(`Failed to download file: ${fileResponse.status} ${fileResponse.statusText}`)
+    }
     const fileContent = await fileResponse.text()
+    console.log('File downloaded, content length:', fileContent.length);
 
     // Create AI prompt for CV analysis
     const prompt = `
