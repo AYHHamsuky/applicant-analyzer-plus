@@ -10,156 +10,48 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
-      cart_items: {
+      job_requirements: {
         Row: {
-          created_at: string | null
-          id: string
-          product_id: string
-          quantity: number
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          product_id: string
-          quantity?: number
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          product_id?: string
-          quantity?: number
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cart_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cart_items_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string | null
+          created_at: string
+          created_by: string | null
           description: string | null
+          experience_level: string | null
           id: string
-          image_url: string | null
-          name: string
-          parent_id: string | null
-          slug: string
-          updated_at: string | null
+          required_skills: string[] | null
+          title: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
+          created_by?: string | null
           description?: string | null
+          experience_level?: string | null
           id?: string
-          image_url?: string | null
-          name: string
-          parent_id?: string | null
-          slug: string
-          updated_at?: string | null
+          required_skills?: string[] | null
+          title: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
+          created_by?: string | null
           description?: string | null
+          experience_level?: string | null
           id?: string
-          image_url?: string | null
-          name?: string
-          parent_id?: string | null
-          slug?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "categories_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      products: {
-        Row: {
-          category_id: string
-          compare_price: number | null
-          created_at: string | null
-          description: string | null
-          id: string
-          image_urls: string[] | null
-          inventory_quantity: number | null
-          is_active: boolean | null
-          price: number
-          seller_id: string
-          sku: string | null
-          tags: string[] | null
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          category_id: string
-          compare_price?: number | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          image_urls?: string[] | null
-          inventory_quantity?: number | null
-          is_active?: boolean | null
-          price: number
-          seller_id: string
-          sku?: string | null
-          tags?: string[] | null
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          category_id?: string
-          compare_price?: number | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          image_urls?: string[] | null
-          inventory_quantity?: number | null
-          is_active?: boolean | null
-          price?: number
-          seller_id?: string
-          sku?: string | null
-          tags?: string[] | null
+          required_skills?: string[] | null
           title?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "products_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_seller_id_fkey"
-            columns: ["seller_id"]
+            foreignKeyName: "job_requirements_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -207,6 +99,47 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Relationships: []
+      }
+      resumes: {
+        Row: {
+          analysis_result: Json | null
+          analyzed_at: string | null
+          file_url: string
+          filename: string
+          id: string
+          match_score: number | null
+          uploaded_at: string
+          user_id: string | null
+        }
+        Insert: {
+          analysis_result?: Json | null
+          analyzed_at?: string | null
+          file_url: string
+          filename: string
+          id?: string
+          match_score?: number | null
+          uploaded_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          analysis_result?: Json | null
+          analyzed_at?: string | null
+          file_url?: string
+          filename?: string
+          id?: string
+          match_score?: number | null
+          uploaded_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
     }
     Views: {
