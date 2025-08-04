@@ -5,6 +5,7 @@ import { CVUpload, ProcessedCV } from '@/components/CVUpload';
 import { JobRequirements, JobRequirement } from '@/components/JobRequirements';
 import { Dashboard } from '@/components/Dashboard';
 import { CandidateCard } from '@/components/CandidateCard';
+import RequestDemo from '@/components/RequestDemo';
 import { 
   Upload, 
   Settings, 
@@ -14,7 +15,10 @@ import {
   CheckCircle,
   Users,
   Award,
-  Zap
+  Zap,
+  Phone,
+  Mail,
+  Globe
 } from 'lucide-react';
 import heroImage from '@/assets/hero-recruitment.jpg';
 
@@ -25,6 +29,7 @@ const Index = () => {
   const [jobRequirements, setJobRequirements] = useState<JobRequirement | null>(null);
   const [candidates, setCandidates] = useState<ProcessedCV[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<ProcessedCV | null>(null);
+  const [showRequestDemo, setShowRequestDemo] = useState(false);
 
   const handleJobRequirementsSet = (requirements: JobRequirement) => {
     setJobRequirements(requirements);
@@ -76,14 +81,14 @@ const Index = () => {
               <Button 
                 variant="hero" 
                 size="xl"
-                onClick={() => setCurrentStep('requirements')}
+                onClick={() => setShowRequestDemo(true)}
                 className="group"
               >
-                Get Started
+                Request Enterprise Demo
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
-              <Button variant="outline" size="xl">
-                Watch Demo
+              <Button variant="outline" size="xl" onClick={() => setCurrentStep('requirements')}>
+                Try Free Sample
               </Button>
             </div>
           </div>
@@ -181,13 +186,22 @@ const Index = () => {
           <p className="text-muted-foreground mb-8">
             Start screening candidates with AI-powered precision today.
           </p>
-          <Button 
-            variant="hero" 
-            size="xl"
-            onClick={() => setCurrentStep('requirements')}
-          >
-            Start Free Analysis
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              variant="hero" 
+              size="xl"
+              onClick={() => setShowRequestDemo(true)}
+            >
+              Request Enterprise Demo
+            </Button>
+            <Button 
+              variant="outline" 
+              size="xl"
+              onClick={() => setCurrentStep('requirements')}
+            >
+              Try Free Sample
+            </Button>
+          </div>
         </Card>
       </div>
     </div>
@@ -329,6 +343,11 @@ const Index = () => {
 
       {renderProgressIndicator()}
       {renderCurrentStep()}
+      
+      {/* Request Demo Modal */}
+      {showRequestDemo && (
+        <RequestDemo onClose={() => setShowRequestDemo(false)} />
+      )}
     </div>
   );
 };
